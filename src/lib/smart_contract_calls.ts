@@ -105,6 +105,19 @@ export async function buyAutoBakers(
     tx.setGasBudget(GAS_BUDGET);
 
     let [paymentIota] = tx.splitCoins(tx.gas, [AUTO_BAKER_BUY_FEE * num]);
+
+    // Claim brownies
+    let brownies = tx.moveCall({
+        package: PACKAGE_ID,
+        module: MODULE_NAME,
+        function: 'claim_brownies',
+        arguments: [
+            tx.object(BROWNIE_INC),
+            tx.object(brownieAccount),
+            tx.object.clock
+        ]
+    });
+    tx.transferObjects([brownies], walletAccount.address);
     
     // Merge brownies
     let holdings = await iotaClient.getOwnedObjects({owner: walletAccount.address, options: {showContent: true}});

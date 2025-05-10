@@ -1,5 +1,7 @@
 // util.ts
 
+import { scale } from "svelte/transition";
+
 export function getObjectExplorerUrl(explorerUrl: string, id: string) {
     return explorerUrl + "/object/" + id
 }
@@ -32,4 +34,44 @@ export function timeHumanReadable(miliseconds: number) {
 
 export function roundFractional(num: number, decimals: number) {
     return Math.round(num * Math.pow(10, decimals)) / Math.pow(10, decimals);
+}
+
+export function formatNum(num: number) {
+    let asString = num.toString()
+    let result = "";
+    let i = asString.length - 1;
+    while (i >= 0) {
+        result = asString.at(i) + result
+        if (i % 3 == 0) {
+            result = '.' + result
+        }
+        i -= 1;
+    }
+    if (result.startsWith('.')) {
+        result = result.slice(1)
+    }
+    return result
+}
+
+export function formatNumShort(num: number) {
+    let scales = [
+        [10**0, ''],
+        [10**3, 'K'],
+        [10**6, 'M'],
+        [10**9, 'B'],
+        [10**12, 'T']
+    ]
+    let max_scale = scales[0];
+    let i = 0;
+    while (i < scales.length) {
+        if (num >= scales[i][0]) {
+            max_scale = scales[i];
+        }
+        i += 1;
+    }
+
+    const scaledNum: number = num / max_scale[0];
+    const formattedNum: string = scaledNum.toFixed(2);
+
+    return formattedNum + ' ' + max_scale[1]
 }

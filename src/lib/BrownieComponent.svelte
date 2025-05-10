@@ -3,7 +3,7 @@
     import { getFullnodeUrl, IotaClient, type IotaObjectData, type IotaObjectResponse } from '@iota/iota-sdk/client';
     import { Transaction } from '@iota/iota-sdk/transactions';
     import { onMount } from 'svelte';
-    import { nanosToIota, shortenHex, timeHumanReadable, getObjectExplorerUrl, roundFractional } from '$lib/util'
+    import { nanosToIota, shortenHex, formatNum, timeHumanReadable, getObjectExplorerUrl, roundFractional, formatNumShort } from '$lib/util'
     import { PACKAGE_ID, BROWNIE_INC, buyAccount, bakeByHand, buyAutoBakers, claimBrownies} from '$lib/smart_contract_calls' 
     
     let activeWallet = $state(null);
@@ -12,6 +12,8 @@
 
     let brownieAccount = $state("");
     let brownieBalance = $state(0);
+
+    let buyMultiplier = $state(1);
 
     let autoBakers: AutoBakerStack[] = $state([]);
     let totalHourlyBakeRate = $derived.by(() => {
@@ -36,7 +38,7 @@
     
     let explorerUrl = "https://explorer.rebased.iota.org/";
     let onChainClockTimestampMs = $state(0);
-    const CLOCK_UPDATE_DELAY = 250;
+    const CLOCK_UPDATE_DELAY = 50;
 
     const iotaClient = new IotaClient({ url: 'https://api.testnet.iota.cafe' });
 
@@ -82,12 +84,12 @@
 
     async function connectWallet() {
         // console.log(await activeWallet.features['standard:connect'])
-        await activeWallet.features['standard:connect'].connect();
-        activeWalletAccount = activeWallet.accounts[0];
         activeWallet.features['standard:events'].on("change", () => {
             activeWalletAccount = activeWallet.accounts[0];
             updateBalance();
         });
+        await activeWallet.features['standard:connect'].connect();
+        activeWalletAccount = activeWallet.accounts[0];
     }
     
     // Helper function to update the balance of the activeWalletAccount
@@ -116,8 +118,25 @@
             autoBakers.push(stack)
         });
         // non-owned auto bakers:
-        let brownieInc = await iotaClient.multiGetObjects({ids: [BROWNIE_INC], options: {showContent: true}});
-        let bakerTypes = brownieInc
+        let brownieInc = await iotaClient.getObject({id: BROWNIE_INC, options: {showContent: true}});
+        let bakerTypes = brownieInc.data?.content.fields["auto_baker_types"]
+        bakerTypes.forEach((type)=> {
+            let hasType = autoBakers.filter((stack) => stack.autoBakerType.id == type.fields["id"]).length > 0;
+            if (!hasType) {
+                let zero_stack: AutoBakerStack = {
+                    id: "",
+                    number: 0,
+                    autoBakerType: {
+                        id: parseInt(type.fields["id"]),
+                        name: String.fromCharCode(...type.fields["name"]),
+                        priceBrownie: parseInt(type.fields["price_brownie"]),
+                        ratePerHour: parseInt(type.fields["rate_per_hour"]),
+                    },
+                    lastClaimTimestampMs: 0
+                }
+                autoBakers.push(zero_stack)
+            }
+        });
         console.log(bakerTypes)
     }
 
@@ -159,6 +178,23 @@
         }, CLOCK_UPDATE_DELAY);
     }
 
+    function cycleBuyMultiplier() {
+        switch(buyMultiplier) {
+            case 1:
+                buyMultiplier = 10;
+                break;
+            case 10:
+                buyMultiplier = 25;
+                break;
+            case 25:
+                buyMultiplier = 100
+                break;
+            case 100:
+                buyMultiplier = 1
+                break;
+        }
+    }
+
     async function initState() {
         await initializeWallet();
         await connectWallet();
@@ -176,26 +212,33 @@
 <div class="mx-auto min-w-[600px] p-4">
     On-Chain Time: {onChainClockTimestampMs > 0 ? new Date(onChainClockTimestampMs).toLocaleString() : 'Syncing...'}
 
-    <div class="flex flex-col w-full max-w-[800px] mx-auto border-2">
-        <div class="flex flex-row">
-            <h1 class="mx-auto my-auto text-xl sm:text-3xl">{brownieBalance + unclaimedBrownies} BROWNIE</h1> 
-            <h2>Per hour: {totalHourlyBakeRate}</h2>
-            <button 
-                onclick={() => claimBrownies(iotaClient, activeWallet, activeWalletAccount, brownieAccount, ()=>{console.log('test'); updateBrownieState()})}
-                class="bg-red-300"
-            >
-                Claim {unclaimedBrownies} baked brownies 
-            </button>
-            <img src="https://i.imgur.com/1i1ybKY.png" alt="Brownie Logo" 
-            class="mx-auto size-48 rounded-full border-2 border-amber-700">
+    <div class="flex flex-col w-full max-w-[800px] mx-auto border-2 items-center bg-slate-200">
+        <div class="flex flex-row ">
+            <div class="flex flex-col w-1/2 justify-around items-center">
+                <div class="flex flex-row gap-2 justify-center items-center p-2">
+                    <h1 class="text-2xl sm:text-3xl">{formatNumShort(brownieBalance + unclaimedBrownies)}</h1>
+                    <p>BROWNIE</p> 
+                </div>
+                <h2>Per hour: {totalHourlyBakeRate}</h2>
+                <button 
+                    onclick={() => claimBrownies(iotaClient, activeWallet, activeWalletAccount, brownieAccount, ()=>{console.log('test'); updateBrownieState()})}
+                    class="border-4 border-[#731702] bg-[#BF6341] p-2 m-4 text-white w-[70%]"
+                >
+                    <p>Claim {formatNumShort(unclaimedBrownies)}</p>
+                    <!-- <p></p>  -->
+                    <p>baked brownies </p>
+                </button>
+            </div>
+            <img src="https://i.imgur.com/KjYzO0g.png" alt="Brownie Logo" 
+            class="mx-auto size-[35%] rounded-full">
         </div>
         <button
             onclick={()=> {initializeWallet(); connectWallet();} }
-            class="bg-orange-500 hover:bg-orange-400 text-white font-bold py-2 px-4 rounded transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed"
+            class="w-[80%] bg-orange-500 hover:bg-orange-400 text-white font-bold py-2 px-4 rounded transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed"
         >
             {!!activeWalletAccount ? 'Wallet Connected ✅' : 'Connect Wallet'}
         </button>
-        <p>Balance: {activeWalletAccountBalance}</p>
+        <p>Balance: {activeWalletAccountBalance} IOTA</p>
         <h2>Brownie Account: {brownieAccount ? shortenHex(brownieAccount, 4) : "No account"}</h2>
         {#if !brownieAccount}
         <button 
@@ -207,24 +250,33 @@
         {/if}
     </div>
 
-    <div class="flex flex-col m-8 bg-[#CFA77E] w-full max-w-[800px] mx-auto">
+    <div class="flex flex-col m-8 p-2 text-[#260101] bg-[#D99379] w-full rounded-md max-w-[800px] mx-auto">
         <h1 class="font-bold text-xl mx-auto"> Bake some brownies!</h1>
+        <button 
+            onclick={cycleBuyMultiplier}
+            class="p-2 m-2 bg-orange-400"
+        >
+            {buyMultiplier} x
+        </button>
         <div class="w-full flex flex-col">
-            <h2 class="mx-auto">Bake by hand</h2>
             <button onclick={()=> {bakeByHand(iotaClient, activeWallet, activeWalletAccount, brownieAccount, updateBrownieState)}}
             class="border-2"
             >
-                Click to bake 10 BROWNIE!
+                Click to bake 10 BROWNIE by hand!
             </button>
         </div>
         {#each autoBakers as autoBakerStack}
-        <div class="flex flex-row justify-between my-2 p-2 border-1 h-24">
-            <h1>{autoBakerStack.autoBakerType.name} (have: {autoBakerStack.number})</h1>
+        <div class="flex flex-row justify-between m-2 p-2 border-1 border-[#260101] rounded-sm">
+            <div class="flex flex-col gap-1">
+                <div class="flex flex-row gap-2 items-center"><b class="text-xl">{autoBakerStack.autoBakerType.name}</b> <p>{autoBakerStack.number} owned</p></div>
+                <div class="flex flex-row gap-2"><b>Unit Rate:</b> <h2>{formatNumShort(autoBakerStack.autoBakerType.ratePerHour)} / h</h2></div>
+                <div class="flex flex-row gap-2"><b>Total:</b> <h2>{formatNumShort(autoBakerStack.autoBakerType.ratePerHour * autoBakerStack.number)} / h</h2></div>
+            </div>
             <button 
-            onclick={() => buyAutoBakers(iotaClient, activeWallet, activeWalletAccount, brownieAccount, autoBakerStack.autoBakerType.id, 1, autoBakerStack.autoBakerType.priceBrownie, updateBrownieState)}
-            class="w-[50%] border-2 p-2 bg-green-400"
+            onclick={() => buyAutoBakers(iotaClient, activeWallet, activeWalletAccount, brownieAccount, autoBakerStack.autoBakerType.id, buyMultiplier, autoBakerStack.autoBakerType.priceBrownie, updateBrownieState)}
+            class="w-[50%] border-2 p-2 bg-green-400 rounded-md"
             >
-                Buy {autoBakerStack.autoBakerType.name} ({autoBakerStack.autoBakerType.priceBrownie} BROWNIE)
+                Buy {buyMultiplier} {autoBakerStack.autoBakerType.name} ({formatNumShort(autoBakerStack.autoBakerType.priceBrownie * buyMultiplier)} BROWNIE)
             </button>
         </div>
         {/each}
