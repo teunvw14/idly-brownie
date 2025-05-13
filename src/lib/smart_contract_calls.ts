@@ -4,14 +4,15 @@ import { Transaction } from '@iota/iota-sdk/transactions';
 
 import { getObjectExplorerUrl } from '$lib/util';
 
-export let PACKAGE_ID = "0x30a86d4f81fe8609ff7e4774b3fc281597e72c2911e805b3180b05c95baae36e";
-export let BROWNIE_INC = "0x2e62d52ab37b4e2e30d9b3a0db67889fd3ec65ea9b0cf914ef1a4dfb9d4548e4";
+export let PACKAGE_ID = "0x55527e8020ab2784f0917fd4b7cb21fe1d03d79bf8d28bda0005cc29dd40bfb1";
+export let BROWNIE_INC = "0x4047bfc4db55d4a5a59ae9b18c164da0ca9f5c44ba4aa61d4f5d93a80c4b2487";
 
 
 const GAS_BUDGET = 100_000_000;
 const MODULE_NAME = "brownie";
-const LICENSE_PRICE_NANO = 10_000_000_000;
+const LICENSE_PRICE_NANO = 100_000_000;
 const AUTO_BAKER_BUY_FEE = 10_000_000;
+export const AUTO_BAKER_PRICE_STEP_PCT = 15;
 const BAKE_BY_HAND_AMOUNT = 10;
 
 export async function buyAccount(
@@ -89,7 +90,6 @@ export async function bakeByHand(
     completionCallback();
 }
 
-
 export async function buyAutoBakers(
     iotaClient: IotaClient, 
     wallet: Wallet,
@@ -97,7 +97,7 @@ export async function buyAutoBakers(
     brownieAccount: string,
     bakerTypeId: number,
     num: number,
-    brownieUnitPrice: number,
+    paymentBrownieAmount: number,
     completionCallback: CallableFunction
 ) {
     // Set up the transaction
@@ -130,7 +130,7 @@ export async function buyAutoBakers(
         tx.mergeCoins(brownieCoinObjects[0], brownieCoinObjects.slice(1))
     }
     
-    let [paymentBrownie] = tx.splitCoins(brownieCoinObjects[0], [num * brownieUnitPrice])
+    let [paymentBrownie] = tx.splitCoins(brownieCoinObjects[0], [paymentBrownieAmount])
     tx.moveCall({
         package: PACKAGE_ID,
         module: MODULE_NAME,

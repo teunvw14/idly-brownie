@@ -70,8 +70,31 @@ export function formatNumShort(num: number) {
         i += 1;
     }
 
+    let scaledNum: number = num / max_scale[0];
+    let rounded = Math.floor(scaledNum * 10) / 10;
+
+    return rounded.toString() + max_scale[1]
+}
+
+export function formatNumShortConstLen(num: number) {
+    let scales = [
+        [10**0, ''],
+        [10**3, 'K'],
+        [10**6, 'M'],
+        [10**9, 'B'],
+        [10**12, 'T']
+    ]
+    let max_scale = scales[0];
+    let i = 0;
+    while (i < scales.length) {
+        if (num >= scales[i][0]) {
+            max_scale = scales[i];
+        }
+        i += 1;
+    }
+
     const scaledNum: number = num / max_scale[0];
     const formattedNum: string = scaledNum.toFixed(2);
 
-    return formattedNum + ' ' + max_scale[1]
+    return formattedNum + max_scale[1]
 }
