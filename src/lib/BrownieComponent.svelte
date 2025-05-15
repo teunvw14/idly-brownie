@@ -1,22 +1,10 @@
 <script lang="ts">
     // Toasts
-    import { Toast } from 'flowbite-svelte';
-    import { CartPlusAltOutline, CheckCircleOutline, InfoCircleSolid, CloseCircleSolid, VolumeMuteSolid, VolumeUpSolid } from 'flowbite-svelte-icons';
+    import { toast, Toast } from 'flowbite-svelte';
+    import { CartPlusAltOutline, CheckCircleOutline, InfoCircleSolid, CloseCircleSolid, VolumeMuteSolid, VolumeUpSolid, StackoverflowSolid } from 'flowbite-svelte-icons';
     import { blur } from 'svelte/transition';
-
+    
     let toastMessages: ToastMessage[] = $state([]);
-
-    interface ToastMessage {
-        message: string,
-        type: number,
-        icon: CartPlusAltOutline | CheckCircleOutline | InfoCircleSolid | CloseCircleSolid
-    }
-
-    const ToastType = {
-        Info: 0,
-        Warning: 1,
-    }
-
     function showToast(type: number, message: string, icon: CartPlusAltOutline | CheckCircleOutline | InfoCircleSolid, duration_ms: number) {
         toastMessages.push({
             message: message,
@@ -27,13 +15,16 @@
             toastMessages = toastMessages.splice(1);
         }, duration_ms);
     }
-
+    
     import { getWallets, WalletStandardError } from '@mysten/wallet-standard';
     import { getFullnodeUrl, IotaClient, type ExecuteTransactionRequestType, type IotaObjectData, type IotaObjectResponse } from '@iota/iota-sdk/client';
     import { Transaction } from '@iota/iota-sdk/transactions';
     import { onMount } from 'svelte';
     import { nanosToIota, shortenHex, formatNum, timeHumanReadable, getObjectExplorerUrl, roundFractional, formatNumShort, formatNumShortConstLen } from '$lib/util'
     import { PACKAGE_ID, BROWNIE_INC, AUTO_BAKER_PRICE_STEP_PCT, buyAccount, bakeByHand, buyAutoBakers, claimBrownies} from '$lib/smart_contract_calls' 
+    
+    import type { AutoBakerStack, AutoBakerType, ToastMessage } from '$lib';
+    import { ToastType } from '$lib';
     
     let activeWallet = $state(null);
     let activeWalletAccount = $state(null);
@@ -79,21 +70,6 @@
     const CLOCK_UPDATE_DELAY = 50;
 
     const iotaClient = new IotaClient({ url: 'https://api.testnet.iota.cafe' });
-
-    interface AutoBakerType {
-        id: number,
-        name: string,
-        basePriceBrownie: number,
-        ratePerHour: number,
-    }
-
-    interface AutoBakerStack {
-        id: string,
-        number: number,
-        autoBakerType: AutoBakerType,
-        lastClaimTimestampMs: number,
-        nextPriceBrownie: number,
-    }
 
     async function initializeWallet() {
         let wallets = getWallets().get();
@@ -218,20 +194,55 @@
         return result;
     }
 
+    async function handleBakeByHand() {
+        actionLoading = true; 
+        try {
+            await bakeByHand(
+                iotaClient,
+                activeWallet,
+                activeWalletAccount,
+                brownieAccount,
+                ()=>{}
+            );
+            showToast(
+                ToastType.Info,
+                "Baked 10 brownies by hand!",
+                CheckCircleOutline,
+                3_000
+            );
+        } catch(e) {
+            showToast(
+                ToastType.Warning,
+                "Something went wrong: " + e.message, CloseCircleSolid, 5_000);
+        }
+        actionLoading = false;
+    }
+    
     async function handleBuyAutoBakers(autoBakerStack: AutoBakerStack){
         actionLoading = true;
         showToast(ToastType.Info, "Buying " + buyMultiplier + " " + autoBakerStack.autoBakerType.name.toString() + "...", CartPlusAltOutline, 2_000);
-        await buyAutoBakers(
-            iotaClient,
-            activeWallet,
-            activeWalletAccount,
-            brownieAccount,
-            autoBakerStack.autoBakerType.id,
-            buyMultiplier,
-            calculatePurchasePrice(autoBakerStack),
-            updateBrownieState
-        );
-        showToast(ToastType.Info, "Successfully bought " + buyMultiplier + " " + autoBakerStack.autoBakerType.name.toString() + ".", CheckCircleOutline, 3_000);
+        try {
+            await buyAutoBakers(
+                iotaClient,
+                activeWallet,
+                activeWalletAccount,
+                brownieAccount,
+                autoBakerStack.autoBakerType,
+                buyMultiplier,
+                calculatePurchasePrice(autoBakerStack),
+                ()=>{}
+            );
+            let stackToUpdate = autoBakers.filter((stack) => stack.autoBakerType.id == autoBakerStack.autoBakerType.id)[0];
+            stackToUpdate.nextPriceBrownie = calculatePurchasePrice(stackToUpdate);
+            stackToUpdate.number += buyMultiplier;
+            stackToUpdate.lastClaimTimestampMs = onChainClockTimestampMs;
+            showToast(ToastType.Info, "Bought " + buyMultiplier + " " + autoBakerStack.autoBakerType.name.toString() + ".", CheckCircleOutline, 3_000);
+        } catch(e) {
+            showToast(
+                ToastType.Warning,
+                "Something went wrong: " + e.message, CloseCircleSolid, 5_000);
+        }
+        actionLoading = false;
     }
 
     async function initOnChainClockTimestampMs() {
@@ -291,7 +302,7 @@ class="w-full h-[15vh]
 >
     <div class="flex flex-row justify-start items-center h-full">
         <button
-            onclick={()=> {initializeWallet(); connectWallet(); showToast(ToastType.Info, "faka man", 2000)} }
+            onclick={()=> {initializeWallet(); connectWallet(); showToast(ToastType.Info, "Connecting Wallet", InfoCircleSolid, 2_000)} }
             class="
             flex flex-col justify-center items-center
             h-[60%] rounded transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed
@@ -333,7 +344,7 @@ class="w-full h-[15vh]
             <h2>Brownie Account: <a href={"https://iotascan.com/testnet/object/" + brownieAccount} class="hover:underline">{shortenHex(brownieAccount, 4)}</a></h2>
         {/if}
         <div class="flex flex-col items-center h-full w-full">
-            <button onclick={()=> {actionLoading = true; bakeByHand(iotaClient, activeWallet, activeWalletAccount, brownieAccount, updateBrownieState)}}
+            <button onclick={()=> handleBakeByHand()}
                 class="h-[60%] rounded-full"
                 disabled={!hasBrownieAccount || !allowScCalls}
                 >
@@ -345,14 +356,14 @@ class="w-full h-[15vh]
                     <h1 class="text-5xl sm:text-7xl">{formatNumShortConstLen(totalBrownieBalance, 3)}</h1>
                 </div>
                 <h2>{formatNumShort(totalBakeRatePerSecond)} / s</h2>
-                <!-- <button 
+                <button 
                     onclick={() => claimBrownies(iotaClient, activeWallet, activeWalletAccount, brownieAccount, ()=>{console.log('test'); updateBrownieState()})}
-                    class="border-4 border-[#731702] bg-[#BF6341] p-2 m-4 text-white w-[70%]"
+                    class="rounded-lg border-4 border-[#731702] bg-[#BF6341] p-1 text-white w-[70%]"
                     disabled={!hasBrownieAccount}
                 >
                     <p>Claim {formatNumShortConstLen(unclaimedBrownieBalance)}</p>
                     <p>baked brownies </p>
-                </button> -->
+                </button>
             </div>
         </div>
     </div>

@@ -3,9 +3,13 @@ import { IotaClient } from '@iota/iota-sdk/client';
 import { Transaction, type TransactionResult } from '@iota/iota-sdk/transactions';
 
 import { getObjectExplorerUrl } from '$lib/util';
+import { CartPlusAltOutline, CheckCircleOutline, InfoCircleSolid, CloseCircleSolid, VolumeMuteSolid, VolumeUpSolid } from 'flowbite-svelte-icons';
+import { ToastType } from '$lib'
 
-export let PACKAGE_ID = "0x55527e8020ab2784f0917fd4b7cb21fe1d03d79bf8d28bda0005cc29dd40bfb1";
-export let BROWNIE_INC = "0x4047bfc4db55d4a5a59ae9b18c164da0ca9f5c44ba4aa61d4f5d93a80c4b2487";
+import type { AutoBakerType, AutoBakerStack, ToastMessage } from '$lib';
+
+export let PACKAGE_ID = "0x6f36f7d461306aa08b8e0949a8cb96188cea0028f0d67f6989c37fab9d0f4163";
+export let BROWNIE_INC = "0x95b4408fad39cc0e39b48fac9a4eff277814f56773120ab68067348853cb7277";
 
 
 const GAS_BUDGET = 100_000_000;
@@ -19,24 +23,19 @@ async function handleTxExecution(
     iotaClient: IotaClient,
     tx: Transaction,
     wallet: Wallet,
-    walletAccount: WalletAccount
+    walletAccount: WalletAccount,
 ) {
-    try {
-        let {bytes, signature} = 
-        await (wallet.features['iota:signTransaction']).signTransaction({
-            transaction: tx, 
-            account: walletAccount,
-        });
-        // Send signed transaction to the network for execution
-        let transactionResult = await iotaClient.executeTransactionBlock({
-            transactionBlock: bytes,
-            signature: signature,
-        })
-        await iotaClient.waitForTransaction({ digest: transactionResult.digest });
-    } catch(e: any) {
-        console.log("Something went wrong sending transaction:");
-        console.log(e.message);
-    }
+    let {bytes, signature} = 
+    await (wallet.features['iota:signTransaction']).signTransaction({
+        transaction: tx, 
+        account: walletAccount,
+    });
+    // Send signed transaction to the network for execution
+    let transactionResult = await iotaClient.executeTransactionBlock({
+        transactionBlock: bytes,
+        signature: signature,
+    })
+    await iotaClient.waitForTransaction({ digest: transactionResult.digest });
 }
 
 export async function buyAccount(
@@ -88,7 +87,7 @@ export async function bakeByHand(
     tx.transferObjects([brownies], walletAccount.address);
     
     await handleTxExecution(iotaClient, tx, wallet, walletAccount);
-    
+
     completionCallback();
 }
 
@@ -97,7 +96,7 @@ export async function buyAutoBakers(
     wallet: Wallet,
     walletAccount: WalletAccount,
     brownieAccount: string,
-    bakerTypeId: number,
+    bakerType: AutoBakerType,
     num: number,
     paymentBrownieAmount: number,
     completionCallback: CallableFunction
@@ -124,7 +123,7 @@ export async function buyAutoBakers(
         [paymentBrownie] = tx.splitCoins(claimedBrownies, [paymentBrownieAmount]);
         tx.transferObjects(claimedBrownies, walletAccount.address);
     } else {
-        tx.mergeCoins(brownieCoinObjects[0], [claimedBrownies]);
+        tx.mergeCoins(brownieCoinObjects[0], [...brownieCoinObjects.splice(1), claimedBrownies]);
         [paymentBrownie] = tx.splitCoins(brownieCoinObjects[0], [paymentBrownieAmount]);
     }
     
@@ -136,7 +135,7 @@ export async function buyAutoBakers(
         arguments: [
             tx.object(brownieAccount),
             tx.object(BROWNIE_INC),
-            tx.pure.u64(bakerTypeId),
+            tx.pure.u64(bakerType.id),
             tx.pure.u64(num),
             tx.object(paymentIota),
             tx.object(paymentBrownie),
