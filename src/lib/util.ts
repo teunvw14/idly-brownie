@@ -76,7 +76,7 @@ export function formatNumShort(num: number) {
     return rounded.toString() + max_scale[1]
 }
 
-export function formatNumShortConstLen(num: number) {
+export function formatNumShortConstLen(num: number, decimals: number) {
     let scales = [
         [10**0, ''],
         [10**3, 'K'],
@@ -94,7 +94,7 @@ export function formatNumShortConstLen(num: number) {
     }
 
     const scaledNum: number = num / max_scale[0];
-    const formattedNum: string = scaledNum.toFixed(2);
+    const formattedNum: string = scaledNum.toFixed(decimals);
 
     return formattedNum + max_scale[1]
 }

@@ -128,7 +128,6 @@
                     lastClaimTimestampMs: parseInt(stackJson.fields["last_claim_timestamp_ms"]),
                     nextPriceBrownie: parseInt(stackJson.fields["next_price_brownie"])
                 }
-                console.log(stack.nextPriceBrownie);
                 autoBakers.push(stack)
             });
         }
@@ -157,7 +156,6 @@
 
     async function updateBrownieState() {
         let holdings = await iotaClient.getOwnedObjects({owner: activeWalletAccount.address, options: {showContent: true, showType: true}});
-        console.log(holdings)
         // Get brownie::Account
         let brownieAccountObjects = holdings.data.filter((obj) => {
             return obj.data?.type.includes(PACKAGE_ID + '::brownie::Account');
@@ -238,13 +236,13 @@
     
 </script>
 
-<div class="flex flex-col items-center h-[100vh] w-screen min-w-[600px] bg-red-200 font-sans">
+<div class="flex flex-col items-center h-[100vh] w-screen bg-red-200 font-sans">
 <div id="header" 
 class="w-full h-[15vh]
     flex flex-row justify-between items-center
     bg-[#D99379] border-[#731702] border-b-8"
 >
-    <div class="w-[33%] flex flex-row justify-start items-center px-8">
+    <div class="w-[33%] flex flex-row justify-start items-center px-2">
         <button
             onclick={()=> {initializeWallet(); connectWallet();} }
             class="w-[80%] h-[65%] bg-[#731702] hover:bg-[#af6856] text-white font-bold rounded transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed"
@@ -260,13 +258,17 @@ class="w-full h-[15vh]
     <div class="w-[34%] h-full flex flex-row justify-center items-center">
         <img src="https://i.imgur.com/saQrZNb.png" alt="logo" class="h-full">
     </div>
-    <div class="w-[33%] mr-4 flex flex-col justify-end items-end px-8">
-        <p>On-chain Time:</p>
-        <p>{onChainClockTimestampMs > 0 ? new Date(onChainClockTimestampMs).toLocaleString() : 'Syncing...'}</p>
+    <div class="w-[33%] h-full mr-4 flex flex-row justify-end items-center">
+        <h1 class="text-2xl sm:text-3xl">{formatNumShortConstLen(totalBrownieBalance, 2)}</h1>
+        <img src="https://i.imgur.com/KjYzO0g.png" alt="Brownie Logo" class="h-full object-scale-down">
+        <!-- <div class="flex flex-row gap-2 text-xs">
+            <p>On-chain Time:</p>
+            <p>{onChainClockTimestampMs > 0 ? new Date(onChainClockTimestampMs).toLocaleString() : 'Syncing...'}</p>
+        </div> -->
     </div>
 </div>
 
-<div class="min-w-[500px] w-[80%] sm:w-[70%] md:w-[60%] p-4 flex flex-col overflow-y-scroll no-scrollbar items-center">
+<div class="w-[95%] sm:w-[70%] md:w-[60%] lg:w-[55%] xl:w-[45%] py-4 flex flex-col overflow-y-scroll no-scrollbar items-center">
     <div class="flex flex-col p-4 items-center bg-[#D99379] border-8 border-[#731702] w-full h-[90%]">
         {#if !hasBrownieAccount}
         <button 
@@ -284,22 +286,21 @@ class="w-full h-[15vh]
                 disabled={!hasBrownieAccount || !allowScCalls}
                 >
                     <img src="https://i.imgur.com/KjYzO0g.png" alt="Brownie Logo" 
-                class="size-full">
+                class="h-full object-scale-down">
             </button>
             <div class="flex flex-col w-full justify-around items-center">
-                <div class="flex flex-row gap-2 justify-center items-center p-2">
-                    <h1 class="text-2xl sm:text-3xl">{formatNumShortConstLen(totalBrownieBalance)}</h1>
-                    <p>BROWNIE</p> 
+                <div class="flex flex-row gap-2 justify-center items-end p-2">
+                    <h1 class="text-5xl sm:text-7xl">{formatNumShortConstLen(totalBrownieBalance, 3)}</h1>
                 </div>
                 <h2>{formatNumShort(totalBakeRatePerSecond)} / s</h2>
-                <button 
+                <!-- <button 
                     onclick={() => claimBrownies(iotaClient, activeWallet, activeWalletAccount, brownieAccount, ()=>{console.log('test'); updateBrownieState()})}
                     class="border-4 border-[#731702] bg-[#BF6341] p-2 m-4 text-white w-[70%]"
                     disabled={!hasBrownieAccount}
                 >
                     <p>Claim {formatNumShortConstLen(unclaimedBrownieBalance)}</p>
                     <p>baked brownies </p>
-                </button>
+                </button> -->
             </div>
         </div>
     </div>
@@ -316,24 +317,27 @@ class="w-full h-[15vh]
             </button>
         </div>
         {#each autoBakers as autoBakerStack}
-        <div class="flex flex-row justify-between m-2 p-2 border-4 border-[#731702] rounded-sm h-[25vh]">
-            <div class="w-[40%] flex flex-col justify-end">
-                <img src={autoBakerImages[autoBakerStack.autoBakerType.id]} alt="AutoBaker" class="h-full aspect-square">
+        <div class="flex flex-col justify-center items-center m-2 border-4 border-[#731702] rounded-sm h-[30vh]">
+            <div class="flex flex-row h-[65%]">
+                <div class="w-[40%] flex flex-col justify-end">
+                    <img src={autoBakerImages[autoBakerStack.autoBakerType.id]} alt="AutoBaker" class="h-full object-scale-down">
+                </div>
+                <div class="flex flex-col">
+                    <div class="flex flex-row gap-2"><b class="text-xl md:text-2xl">{autoBakerStack.autoBakerType.name}</b> </div>
+                    <div class="flex flex-row gap-2"><b class="text-sm sm:text-md">Owned:</b>     <p class="text-xs sm:text-sm">{autoBakerStack.number}</p></div>
+                    <div class="flex flex-row gap-2"><b class="text-sm sm:text-md">Unit Rate:</b> <p class="text-xs sm:text-sm">{formatNumShortConstLen(autoBakerStack.autoBakerType.ratePerHour)} / h</p></div>
+                    <div class="flex flex-row gap-2"><b class="text-sm sm:text-md">Total:</b>     <p class="text-xs sm:text-sm">{formatNumShortConstLen(autoBakerStack.autoBakerType.ratePerHour * autoBakerStack.number)} / h</p></div>
+                </div>
             </div>
-            <div class="flex flex-col gap-1 w-[35%] pt-4">
-                <div class="flex flex-row gap-2 items-center"><b class="text-xl">{autoBakerStack.autoBakerType.name}</b> </div>
-                <div class="flex flex-row gap-2"><b>Owned:</b> <p>{autoBakerStack.number}</p></div>
-                <div class="flex flex-row gap-2"><b>Unit Rate:</b> <h2>{formatNumShortConstLen(autoBakerStack.autoBakerType.ratePerHour)} / h</h2></div>
-                <div class="flex flex-row gap-2"><b>Total:</b> <h2>{formatNumShortConstLen(autoBakerStack.autoBakerType.ratePerHour * autoBakerStack.number)} / h</h2></div>
+            <div class="h-[23%] w-[95%]">
+                <button 
+                onclick={() => {actionLoading = true; buyAutoBakers(iotaClient, activeWallet, activeWalletAccount, brownieAccount, autoBakerStack.autoBakerType.id, buyMultiplier, calculatePurchasePrice(autoBakerStack), updateBrownieState)}}
+                class="size-full border-2 bg-[#9ab503] hover:bg-[#b4c16a] rounded-md disabled:bg-[#6c7730]"
+                disabled={totalBrownieBalance < calculatePurchasePrice(autoBakerStack) || !allowScCalls}
+                >
+                    <p>Buy {buyMultiplier} ({formatNumShort(calculatePurchasePrice(autoBakerStack))} BROWNIE)</p>
+                </button>
             </div>
-            <button 
-            onclick={() => {actionLoading = true; buyAutoBakers(iotaClient, activeWallet, activeWalletAccount, brownieAccount, autoBakerStack.autoBakerType.id, buyMultiplier, calculatePurchasePrice(autoBakerStack), updateBrownieState)}}
-            class="w-[25%] border-2 p-2 bg-[#9ab503] hover:bg-[#b4c16a] rounded-md disabled:bg-[#6c7730]"
-            disabled={totalBrownieBalance < calculatePurchasePrice(autoBakerStack) || !allowScCalls}
-            >
-                <p>Buy {buyMultiplier}</p>
-                <p>({formatNumShort(calculatePurchasePrice(autoBakerStack))} BROWNIE)</p>
-            </button>
         </div>
         {/each}
         <!-- <div>

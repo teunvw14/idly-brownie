@@ -1,6 +1,6 @@
 import type { Wallet, WalletAccount, WindowRegisterWalletEvent } from '@mysten/wallet-standard';
 import { IotaClient } from '@iota/iota-sdk/client';
-import { Transaction } from '@iota/iota-sdk/transactions';
+import { Transaction, type TransactionResult } from '@iota/iota-sdk/transactions';
 
 import { getObjectExplorerUrl } from '$lib/util';
 
@@ -14,6 +14,30 @@ const LICENSE_PRICE_NANO = 100_000_000;
 const AUTO_BAKER_BUY_FEE = 10_000_000;
 export const AUTO_BAKER_PRICE_STEP_PCT = 15;
 const BAKE_BY_HAND_AMOUNT = 10;
+
+async function handleTxExecution(
+    iotaClient: IotaClient,
+    tx: Transaction,
+    wallet: Wallet,
+    walletAccount: WalletAccount
+) {
+    try {
+        let {bytes, signature} = 
+        await (wallet.features['iota:signTransaction']).signTransaction({
+            transaction: tx, 
+            account: walletAccount,
+        });
+        // Send signed transaction to the network for execution
+        let transactionResult = await iotaClient.executeTransactionBlock({
+            transactionBlock: bytes,
+            signature: signature,
+        })
+        await iotaClient.waitForTransaction({ digest: transactionResult.digest });
+    } catch(e: any) {
+        console.log("Something went wrong sending transaction:");
+        console.log(e.message);
+    }
+}
 
 export async function buyAccount(
     iotaClient: IotaClient, 
@@ -36,19 +60,8 @@ export async function buyAccount(
         ]
     });
 
-    let {bytes, signature} = 
-    await (wallet.features['iota:signTransaction']).signTransaction({
-        transaction: tx, 
-        account: walletAccount,
-    });
-
-    // Send signed transaction to the network for execution
-    let transactionResult = await iotaClient.executeTransactionBlock({
-        transactionBlock: bytes,
-        signature: signature,
-    })
-
-    await iotaClient.waitForTransaction({ digest: transactionResult.digest });
+    await handleTxExecution(iotaClient, tx, wallet, walletAccount);
+    
     completionCallback();
 }
 
@@ -62,7 +75,7 @@ export async function bakeByHand(
     // Set up the transaction
     let tx = new Transaction();
     tx.setGasBudget(GAS_BUDGET);
-
+    
     let brownies = tx.moveCall({
         package: PACKAGE_ID,
         module: MODULE_NAME,
@@ -73,20 +86,9 @@ export async function bakeByHand(
         ]
     });
     tx.transferObjects([brownies], walletAccount.address);
-
-    let {bytes, signature} = 
-    await (wallet.features['iota:signTransaction']).signTransaction({
-        transaction: tx, 
-        account: walletAccount,
-    });
-
-    // Send signed transaction to the network for execution
-    let transactionResult = await iotaClient.executeTransactionBlock({
-        transactionBlock: bytes,
-        signature: signature,
-    })
-
-    await iotaClient.waitForTransaction({ digest: transactionResult.digest });
+    
+    await handleTxExecution(iotaClient, tx, wallet, walletAccount);
+    
     completionCallback();
 }
 
@@ -103,34 +105,30 @@ export async function buyAutoBakers(
     // Set up the transaction
     let tx = new Transaction();
     tx.setGasBudget(GAS_BUDGET);
-
-    let [paymentIota] = tx.splitCoins(tx.gas, [AUTO_BAKER_BUY_FEE * num]);
-
-    // Claim brownies
-    let brownies = tx.moveCall({
-        package: PACKAGE_ID,
-        module: MODULE_NAME,
-        function: 'claim_brownies',
-        arguments: [
-            tx.object(BROWNIE_INC),
-            tx.object(brownieAccount),
-            tx.object.clock
-        ]
-    });
-    tx.transferObjects([brownies], walletAccount.address);
     
-    // Merge brownies
+    // Check which Brownie coins account holds
     let holdings = await iotaClient.getOwnedObjects({owner: walletAccount.address, options: {showContent: true}});
     let brownieCoins = holdings.data.filter((obj) => {
         return obj.data?.content?.type.includes(PACKAGE_ID+'::brownie::BROWNIE');
     });
     let brownieCoinsIds = brownieCoins.map((brownie) => brownie.data?.objectId);
     let brownieCoinObjects = brownieCoinsIds.map((id) => tx.object(id));
-    if (brownieCoins.length > 1){
-        tx.mergeCoins(brownieCoinObjects[0], brownieCoinObjects.slice(1))
+    console.log(brownieCoinObjects);
+    
+    let claimedBrownies = callClaimBrownies(tx, walletAccount, brownieAccount);
+    
+    // If no Coin<BROWNIE> owned, then split directly from claimedBrownies.
+    // Otherwise, first merge claimedBrownies into the first Coin<BROWNIE>.
+    let paymentBrownie;
+    if (brownieCoins.length == 0){
+        [paymentBrownie] = tx.splitCoins(claimedBrownies, [paymentBrownieAmount]);
+        tx.transferObjects(claimedBrownies, walletAccount.address);
+    } else {
+        tx.mergeCoins(brownieCoinObjects[0], [claimedBrownies]);
+        [paymentBrownie] = tx.splitCoins(brownieCoinObjects[0], [paymentBrownieAmount]);
     }
     
-    let [paymentBrownie] = tx.splitCoins(brownieCoinObjects[0], [paymentBrownieAmount])
+    let [paymentIota] = tx.splitCoins(tx.gas, [AUTO_BAKER_BUY_FEE * num]);
     tx.moveCall({
         package: PACKAGE_ID,
         module: MODULE_NAME,
@@ -146,20 +144,27 @@ export async function buyAutoBakers(
         ]
     });
 
-    let {bytes, signature} = 
-    await (wallet.features['iota:signTransaction']).signTransaction({
-        transaction: tx, 
-        account: walletAccount,
-    });
+    await handleTxExecution(iotaClient, tx, wallet, walletAccount);
 
-    // Send signed transaction to the network for execution
-    let transactionResult = await iotaClient.executeTransactionBlock({
-        transactionBlock: bytes,
-        signature: signature,
-    })
-
-    await iotaClient.waitForTransaction({ digest: transactionResult.digest });
     completionCallback();
+}
+
+function callClaimBrownies(
+    tx: Transaction,
+    walletAccount: WalletAccount,
+    brownieAccount,
+): TransactionResult {
+    let brownies = tx.moveCall({
+        package: PACKAGE_ID,
+        module: MODULE_NAME,
+        function: 'claim_brownies',
+        arguments: [
+            tx.object(BROWNIE_INC),
+            tx.object(brownieAccount),
+            tx.object.clock
+        ]
+    });
+    return brownies;
 }
 
 export async function claimBrownies(
@@ -173,30 +178,10 @@ export async function claimBrownies(
     let tx = new Transaction();
     tx.setGasBudget(GAS_BUDGET);
 
-    let brownies = tx.moveCall({
-        package: PACKAGE_ID,
-        module: MODULE_NAME,
-        function: 'claim_brownies',
-        arguments: [
-            tx.object(BROWNIE_INC),
-            tx.object(brownieAccount),
-            tx.object.clock
-        ]
-    });
-    tx.transferObjects([brownies], walletAccount.address);
+    let claimedBrownies = callClaimBrownies(tx, walletAccount, brownieAccount);
+    tx.transferObjects([claimedBrownies], walletAccount.address);
 
-    let {bytes, signature} = 
-    await (wallet.features['iota:signTransaction']).signTransaction({
-        transaction: tx, 
-        account: walletAccount,
-    });
-
-    // Send signed transaction to the network for execution
-    let transactionResult = await iotaClient.executeTransactionBlock({
-        transactionBlock: bytes,
-        signature: signature,
-    })
-
-    await iotaClient.waitForTransaction({ digest: transactionResult.digest });
+    await handleTxExecution(iotaClient, tx, wallet, walletAccount);
+    
     completionCallback();
 }
