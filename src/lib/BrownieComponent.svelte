@@ -1,31 +1,35 @@
 <script lang="ts">
-        // Toasts
+    // Toasts
     import { Toast } from 'flowbite-svelte';
-    import { CloseCircleSolid, InfoCircleSolid, VolumeMuteSolid, VolumeUpSolid } from 'flowbite-svelte-icons';
+    import { CartPlusAltOutline, CheckCircleOutline, InfoCircleSolid, CloseCircleSolid, VolumeMuteSolid, VolumeUpSolid } from 'flowbite-svelte-icons';
     import { blur } from 'svelte/transition';
 
-    let toastWarningText = $state("Warning!");
-    let errorToastVisible = $state(false);
-    let infoToastVisible = $state(false);
+    let toastMessages: ToastMessage[] = $state([]);
 
-    function toastShowError(message: string, duration_ms: number) {
-        errorToastVisible = true;
-        toastWarningText = message;
-        setTimeout(() => {
-            errorToastVisible = false;
-        }, duration_ms);
+    interface ToastMessage {
+        message: string,
+        type: number,
+        icon: CartPlusAltOutline | CheckCircleOutline | InfoCircleSolid | CloseCircleSolid
     }
 
-    function toastShowInfo(message: string, duration_ms: number) {
-        infoToastVisible = true;
-        toastWarningText = message;
+    const ToastType = {
+        Info: 0,
+        Warning: 1,
+    }
+
+    function showToast(type: number, message: string, icon: CartPlusAltOutline | CheckCircleOutline | InfoCircleSolid, duration_ms: number) {
+        toastMessages.push({
+            message: message,
+            type: type,
+            icon: icon,
+        });
         setTimeout(() => {
-            infoToastVisible = false;
+            toastMessages = toastMessages.splice(1);
         }, duration_ms);
     }
 
     import { getWallets, WalletStandardError } from '@mysten/wallet-standard';
-    import { getFullnodeUrl, IotaClient, type IotaObjectData, type IotaObjectResponse } from '@iota/iota-sdk/client';
+    import { getFullnodeUrl, IotaClient, type ExecuteTransactionRequestType, type IotaObjectData, type IotaObjectResponse } from '@iota/iota-sdk/client';
     import { Transaction } from '@iota/iota-sdk/transactions';
     import { onMount } from 'svelte';
     import { nanosToIota, shortenHex, formatNum, timeHumanReadable, getObjectExplorerUrl, roundFractional, formatNumShort, formatNumShortConstLen } from '$lib/util'
@@ -94,25 +98,25 @@
     async function initializeWallet() {
         let wallets = getWallets().get();
         if (wallets.length == 0) {
-            console.log("No wallets found to connect to. Make sure you installed an IOTA web wallet.");
+            showToast(ToastType.Warning, "No wallets found to connect to. Make sure you installed an IOTA.", CloseCircleSolid, 5_000);
             return;
         }
         // console.log(wallets)
         // console.log(wallets.filter((w) => {
-        //     return ["IOTA Wallet", "Nightly"].includes(w.name);
-        // }))
-
-        let eligibleWallets = wallets.filter((w) => {
-            return ["IOTA Wallet", "Nightly"].includes(w.name) &&
+            //     return ["IOTA Wallet", "Nightly"].includes(w.name);
+            // }))
+            
+            let eligibleWallets = wallets.filter((w) => {
+                return ["IOTA Wallet", "Nightly"].includes(w.name) &&
                 w.chains.includes("iota:mainnet");
-        })
-        // console.log(eligibleWallets)
-        activeWallet = eligibleWallets[0];
-
-        // console.log("eligibleWallets");
-        // console.log(eligibleWallets);
-        if (!activeWallet) {
-            console.log("No IOTA wallets found to connect to. Make sure you installed an IOTA web wallet.");
+            })
+            // console.log(eligibleWallets)
+            activeWallet = eligibleWallets[0];
+            
+            // console.log("eligibleWallets");
+            // console.log(eligibleWallets);
+            if (!activeWallet) {
+            showToast(ToastType.Warning, "No wallets found to connect to. Make sure you installed an IOTA.", CloseCircleSolid, 5_000);
             return;
         }
     }
@@ -211,9 +215,23 @@
             result += nextPrice;
             nextPrice = Math.floor(nextPrice * (100 + AUTO_BAKER_PRICE_STEP_PCT) / 100.0);
         }
-        // console.log(result);
-        // console.log(brownieBalance);
         return result;
+    }
+
+    async function handleBuyAutoBakers(autoBakerStack: AutoBakerStack){
+        actionLoading = true;
+        showToast(ToastType.Info, "Buying " + buyMultiplier + " " + autoBakerStack.autoBakerType.name.toString() + "...", CartPlusAltOutline, 2_000);
+        await buyAutoBakers(
+            iotaClient,
+            activeWallet,
+            activeWalletAccount,
+            brownieAccount,
+            autoBakerStack.autoBakerType.id,
+            buyMultiplier,
+            calculatePurchasePrice(autoBakerStack),
+            updateBrownieState
+        );
+        showToast(ToastType.Info, "Successfully bought " + buyMultiplier + " " + autoBakerStack.autoBakerType.name.toString() + ".", CheckCircleOutline, 3_000);
     }
 
     async function initOnChainClockTimestampMs() {
@@ -255,7 +273,7 @@
     }
 
     function showWelcomeMessage() {
-        toastShowInfo("Welcome to Idly Brownie!", 3_000);
+        showToast(ToastType.Info, "Welcome to Idly Brownie!", InfoCircleSolid, 3_000);
     }
 
     onMount(() => {
@@ -273,7 +291,7 @@ class="w-full h-[15vh]
 >
     <div class="flex flex-row justify-start items-center h-full">
         <button
-            onclick={()=> {initializeWallet(); connectWallet();} }
+            onclick={()=> {initializeWallet(); connectWallet(); showToast(ToastType.Info, "faka man", 2000)} }
             class="
             flex flex-col justify-center items-center
             h-[60%] rounded transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed
@@ -357,15 +375,15 @@ class="w-full h-[15vh]
                     <img src={autoBakerImages[autoBakerStack.autoBakerType.id]} alt="AutoBaker" class="h-full object-scale-down">
                 </div>
                 <div class="flex flex-col">
-                    <div class="flex flex-row gap-2"><b class="text-xl md:text-2xl">{autoBakerStack.autoBakerType.name}</b> </div>
-                    <div class="flex flex-row gap-2"><b class="text-sm sm:text-md">Owned:</b>     <p class="text-xs sm:text-sm">{autoBakerStack.number}</p></div>
-                    <div class="flex flex-row gap-2"><b class="text-sm sm:text-md">Unit Rate:</b> <p class="text-xs sm:text-sm">{formatNumShortConstLen(autoBakerStack.autoBakerType.ratePerHour)} / h</p></div>
-                    <div class="flex flex-row gap-2"><b class="text-sm sm:text-md">Total:</b>     <p class="text-xs sm:text-sm">{formatNumShortConstLen(autoBakerStack.autoBakerType.ratePerHour * autoBakerStack.number)} / h</p></div>
+                    <div class="flex flex-row items-center gap-2"><b class="text-xl md:text-2xl">{autoBakerStack.autoBakerType.name}</b> </div>
+                    <div class="flex flex-row items-center gap-2"><b class="text-sm sm:text-md">Owned:</b>     <p class="text-xs sm:text-sm">{autoBakerStack.number}</p></div>
+                    <div class="flex flex-row items-center gap-2"><b class="text-sm sm:text-md">Unit Rate:</b> <p class="text-xs sm:text-sm">{formatNumShort(autoBakerStack.autoBakerType.ratePerHour)} / h</p></div>
+                    <div class="flex flex-row items-center gap-2"><b class="text-sm sm:text-md">Total:</b>     <p class="text-xs sm:text-sm">{formatNumShort(autoBakerStack.autoBakerType.ratePerHour * autoBakerStack.number)} / h</p></div>
                 </div>
             </div>
             <div class="h-[23%] w-[95%]">
                 <button 
-                onclick={() => {actionLoading = true; toastShowInfo("Buying " + buyMultiplier + " " + autoBakerStack.autoBakerType.name.toString() + "...", 5_000); buyAutoBakers(iotaClient, activeWallet, activeWalletAccount, brownieAccount, autoBakerStack.autoBakerType.id, buyMultiplier, calculatePurchasePrice(autoBakerStack), updateBrownieState)}}
+                onclick={() => handleBuyAutoBakers(autoBakerStack)}
                 class="size-full border-2 bg-[#9ab503] hover:bg-[#b4c16a] rounded-md disabled:bg-[#6c7730]"
                 disabled={totalBrownieBalance < calculatePurchasePrice(autoBakerStack) || !allowScCalls}
                 >
@@ -389,24 +407,35 @@ class="w-full h-[15vh]
 </div>
 
 <!-- Toasts -->
-{#if infoToastVisible}
-<Toast 
-transition={blur} params={{ amount: 10 }} 
-class="
-    info-toast
-    fixed bottom-[10%] left-[5%] w-[90%]
-    border-[#d99379] bg-[#731702] text-slate-200 border-4 rounded-xl
-">
-    <div class="flex flex-row gap-1">
-        <InfoCircleSolid class="w-6 h-6 text-slate-200" />
-        <p class="text-md sm:text-lg">
-            {toastWarningText}
-        </p>
-    </div>
-</Toast>
-{/if}
+<div class="fixed bottom-[2%] left-[5%] w-[90%] md:left-[10%] md:w-[50%]">
+    {#each toastMessages as toast}
+    <Toast 
+    dismissable={false}
+    transition={blur} params={{ amount: 10 }} 
+    class="
+        info-toast
+        w-full h-[15vh] my-2
+        border-[#d9b479] bg-[#731702] text-slate-200 border-4 rounded-xl
+    ">
+        <div class="flex flex-row items-center gap-1">
+            {#if toast.icon == CartPlusAltOutline}
+                <CartPlusAltOutline class="w-[7%] sm:w-[5%]"/>
+            {:else if toast.icon == CheckCircleOutline}
+                <CheckCircleOutline class="w-[7%] sm:w-[5%]"/>
+            {:else if toast.icon == InfoCircleSolid}
+                <InfoCircleSolid class="w-[7%] sm:w-[5%]"/>
+            {:else if toast.icon == CloseCircleSolid}
+                <CloseCircleSolid class="w-[7%] sm:w-[5%]"/>
+            {/if}
+            <p class="text-md sm:text-lg">
+                {toast.message}
+            </p>
+        </div>
+    </Toast>
+    {/each}
+</div>
 
-{#if errorToastVisible}
+<!-- 
 <Toast 
 transition={blur} params={{ amount: 10 }} 
 class="
@@ -418,5 +447,4 @@ bg-red-700 text-slate-200 border-4 border-slate-200
     <p class="text-md sm:text-lg">
         {toastWarningText}
     </p>
-</Toast>
-{/if}
+</Toast> -->
