@@ -239,28 +239,23 @@
 <div class="flex flex-col items-center h-[100vh] w-screen bg-red-200 font-sans">
 <div id="header" 
 class="w-full h-[15vh]
-    flex flex-row justify-between items-center
+    flex flex-row justify-between items-center p-2
     bg-[#D99379] border-[#731702] border-b-8"
 >
-    <div class="w-[33%] flex flex-row justify-start items-center px-2">
+    <div class="flex flex-row justify-start items-center h-[80%]">
         <button
             onclick={()=> {initializeWallet(); connectWallet();} }
-            class="w-[80%] h-[65%] bg-[#731702] hover:bg-[#af6856] text-white font-bold rounded transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed"
+            class="size-full text-sm p-2 sm:text-base bg-[#731702] hover:bg-[#af6856] text-white font-bold rounded transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed"
         >
-            {!!activeWalletAccount ? 'Wallet Connected ✅' : 'Connect Wallet'}
-            {#if activeWalletAccount}
-            <p>
-                {shortenHex(activeWalletAccount.address, 4)}
-            </p>
-            {/if}
+            {!!activeWalletAccount ? 'Wallet Connected' : 'Connect Wallet'}
         </button>
     </div>
-    <div class="w-[34%] h-full flex flex-row justify-center items-center">
+    <div class="h-full flex flex-row justify-center items-center">
         <img src="https://i.imgur.com/saQrZNb.png" alt="logo" class="h-full">
     </div>
-    <div class="w-[33%] h-full mr-4 flex flex-row justify-end items-center">
-        <h1 class="text-2xl sm:text-3xl">{formatNumShortConstLen(totalBrownieBalance, 2)}</h1>
-        <img src="https://i.imgur.com/KjYzO0g.png" alt="Brownie Logo" class="h-full object-scale-down">
+    <div class="h-full flex flex-row justify-end items-center">
+        <h1 class="text-xl sm:text-3xl">{formatNumShortConstLen(totalBrownieBalance, 0)}</h1>
+        <img src="https://i.imgur.com/KjYzO0g.png" alt="Brownie Logo" class="h-1/2 sm:h-full object-scale-down">
         <!-- <div class="flex flex-row gap-2 text-xs">
             <p>On-chain Time:</p>
             <p>{onChainClockTimestampMs > 0 ? new Date(onChainClockTimestampMs).toLocaleString() : 'Syncing...'}</p>
