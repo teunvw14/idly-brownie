@@ -1,4 +1,29 @@
 <script lang="ts">
+        // Toasts
+    import { Toast } from 'flowbite-svelte';
+    import { CloseCircleSolid, InfoCircleSolid, VolumeMuteSolid, VolumeUpSolid } from 'flowbite-svelte-icons';
+    import { blur } from 'svelte/transition';
+
+    let toastWarningText = $state("Warning!");
+    let errorToastVisible = $state(false);
+    let infoToastVisible = $state(false);
+
+    function toastShowError(message: string, duration_ms: number) {
+        errorToastVisible = true;
+        toastWarningText = message;
+        setTimeout(() => {
+            errorToastVisible = false;
+        }, duration_ms);
+    }
+
+    function toastShowInfo(message: string, duration_ms: number) {
+        infoToastVisible = true;
+        toastWarningText = message;
+        setTimeout(() => {
+            infoToastVisible = false;
+        }, duration_ms);
+    }
+
     import { getWallets, WalletStandardError } from '@mysten/wallet-standard';
     import { getFullnodeUrl, IotaClient, type IotaObjectData, type IotaObjectResponse } from '@iota/iota-sdk/client';
     import { Transaction } from '@iota/iota-sdk/transactions';
@@ -9,7 +34,6 @@
     let activeWallet = $state(null);
     let activeWalletAccount = $state(null);
     let activeWalletAccountBalance = $state(0); 
-
 
     let autoBakerImages = {
         0: "https://i.imgur.com/yQaneY8.png",
@@ -230,8 +254,13 @@
         await updateBrownieState();
     }
 
+    function showWelcomeMessage() {
+        toastShowInfo("Welcome to Idly Brownie!", 3_000);
+    }
+
     onMount(() => {
         initState();
+        showWelcomeMessage();
     })
     
 </script>
@@ -239,15 +268,25 @@
 <div class="flex flex-col items-center h-[100vh] w-screen bg-red-200 font-sans">
 <div id="header" 
 class="w-full h-[15vh]
-    flex flex-row justify-between items-center p-2
+    flex flex-row justify-between items-center px-2 sm:px-8
     bg-[#D99379] border-[#731702] border-b-8"
 >
-    <div class="flex flex-row justify-start items-center h-[80%]">
+    <div class="flex flex-row justify-start items-center h-full">
         <button
             onclick={()=> {initializeWallet(); connectWallet();} }
-            class="size-full text-sm p-2 sm:text-base bg-[#731702] hover:bg-[#af6856] text-white font-bold rounded transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed"
+            class="
+            flex flex-col justify-center items-center
+            h-[60%] rounded transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed
+            p-2
+            bg-[#731702] hover:bg-[#af6856]"
         >
-            {!!activeWalletAccount ? 'Wallet Connected' : 'Connect Wallet'}
+        <p class="text-[8pt] sm:text-sm md:text-base text-white">
+            {!!activeWalletAccount ? 'Wallet' : 'Connect'}
+        </p>
+        <p class="text-[8pt] sm:text-sm md:text-base text-white">
+            {!!activeWalletAccount ? 'Connected' : 'Wallet'}
+        </p>
+
         </button>
     </div>
     <div class="h-full flex flex-row justify-center items-center">
@@ -326,7 +365,7 @@ class="w-full h-[15vh]
             </div>
             <div class="h-[23%] w-[95%]">
                 <button 
-                onclick={() => {actionLoading = true; buyAutoBakers(iotaClient, activeWallet, activeWalletAccount, brownieAccount, autoBakerStack.autoBakerType.id, buyMultiplier, calculatePurchasePrice(autoBakerStack), updateBrownieState)}}
+                onclick={() => {actionLoading = true; toastShowInfo("Buying " + buyMultiplier + " " + autoBakerStack.autoBakerType.name.toString() + "...", 5_000); buyAutoBakers(iotaClient, activeWallet, activeWalletAccount, brownieAccount, autoBakerStack.autoBakerType.id, buyMultiplier, calculatePurchasePrice(autoBakerStack), updateBrownieState)}}
                 class="size-full border-2 bg-[#9ab503] hover:bg-[#b4c16a] rounded-md disabled:bg-[#6c7730]"
                 disabled={totalBrownieBalance < calculatePurchasePrice(autoBakerStack) || !allowScCalls}
                 >
@@ -348,3 +387,36 @@ class="w-full h-[15vh]
 
 </div>    
 </div>
+
+<!-- Toasts -->
+{#if infoToastVisible}
+<Toast 
+transition={blur} params={{ amount: 10 }} 
+class="
+    info-toast
+    fixed bottom-[10%] left-[5%] w-[90%]
+    border-[#d99379] bg-[#731702] text-slate-200 border-4 rounded-xl
+">
+    <div class="flex flex-row gap-1">
+        <InfoCircleSolid class="w-6 h-6 text-slate-200" />
+        <p class="text-md sm:text-lg">
+            {toastWarningText}
+        </p>
+    </div>
+</Toast>
+{/if}
+
+{#if errorToastVisible}
+<Toast 
+transition={blur} params={{ amount: 10 }} 
+class="
+error-toast
+fixed bottom-[12%] left-[2%] z-100
+bg-red-700 text-slate-200 border-4 border-slate-200
+">
+<CloseCircleSolid class="w-6 h-6 text-slate-200" />
+    <p class="text-md sm:text-lg">
+        {toastWarningText}
+    </p>
+</Toast>
+{/if}

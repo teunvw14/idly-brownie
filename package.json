@@ -24,6 +24,8 @@
 	},
 	"dependencies": {
 		"@iota/iota-sdk": "^1.0.1",
-		"@mysten/wallet-standard": "^0.14.9"
+		"@mysten/wallet-standard": "^0.14.9",
+		"flowbite-svelte": "^1.2.2",
+		"flowbite-svelte-icons": "^2.1.1"
 	}
 }
