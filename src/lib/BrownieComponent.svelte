@@ -426,7 +426,7 @@ class="w-full h-[15vh]
     class="
         info-toast
         w-full h-[15vh] my-2
-        border-[#d9b479] bg-[#731702] text-slate-200 border-4 rounded-xl
+        border-[#d9b479] bg-gradient-to-br from-[#93250d] to-[#601402] text-slate-200 border-4 rounded-xl
     ">
         <div class="flex flex-row items-center gap-1">
             {#if toast.icon == CartPlusAltOutline}
