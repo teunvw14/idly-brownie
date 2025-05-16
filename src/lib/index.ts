@@ -12,18 +12,6 @@ export const ToastType = {
     Warning: 1,
 }
 
-export function showToast(toastMessages: ToastMessage[], type: number, message: string, icon: CartPlusAltOutline | CheckCircleOutline | InfoCircleSolid, duration_ms: number) {
-    toastMessages.push({
-        message: message,
-        type: type,
-        icon: icon,
-    });
-    setTimeout(() => {
-        console.log(toastMessages.length)
-        toastMessages = toastMessages.splice(1);
-        console.log(toastMessages.length)
-    }, duration_ms);
-}
 
 export interface AutoBakerType {
     id: number,

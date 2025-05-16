@@ -358,8 +358,9 @@ class="w-full h-[15vh]
     </div>
 </div>
 
-<div class="w-[95%] sm:w-[70%] md:w-[60%] lg:w-[55%] xl:w-[45%] py-4 flex flex-col overflow-y-scroll no-scrollbar items-center">
-    <div class="flex flex-col p-4 items-center bg-[#D99379] border-8 border-[#731702] w-full h-[80vh]">
+<div id="body"
+class="w-[95%] sm:w-[70%] md:w-[60%] lg:w-[55%] xl:w-[45%] py-4 flex flex-col justify-between overflow-y-scroll no-scrollbar items-center">
+    <div class="flex flex-col p-4 justify-between items-center bg-[#D99379] border-8 border-[#731702] w-full h-full">
         {#if !hasBrownieAccount}
         <button 
             onclick={() => {buyAccount(iotaClient, activeWallet, activeWalletAccount, updateBrownieState)}}
@@ -370,33 +371,32 @@ class="w-full h-[15vh]
         {:else}
             <h2>Brownie Account: <a href={"https://iotascan.com/testnet/object/" + brownieAccount} class="hover:underline">{shortenHex(brownieAccount, 4)}</a></h2>
         {/if}
-        <div class="flex flex-col items-center h-full w-full">
-            <button onclick={()=> handleBakeByHand()}
-                class="h-[60%] rounded-full"
-                disabled={!hasBrownieAccount || !allowScCalls}
-                >
-                    <img src="https://i.imgur.com/KjYzO0g.png" alt="Brownie Logo" 
-                class="h-full object-scale-down">
-            </button>
-            <div class="flex flex-col w-full justify-around items-center">
-                <div class="flex flex-row gap-2 justify-center items-end p-2">
-                    <h1 class="text-5xl sm:text-7xl">{formatNumShortConstLen(totalBrownieBalance, 3)}</h1>
-                </div>
-                <h2>{formatNumShort(totalBakeRatePerSecond)} / s</h2>
-                <button 
-                    onclick={() => handleClaimBrownies()}
-                    class="rounded-lg border-4 border-[#731702] bg-[#BF6341] p-1 text-white w-[70%]"
-                    disabled={!hasBrownieAccount}
-                >
-                    {#if actionLoading}
-                    <Spinner color="red" class="h-[55%]"/>
-                    {:else}
-                    <p>Claim {formatNumShortConstLen(unclaimedBrownieBalance, 1)}</p>
-                    <p>baked brownies </p>
-                    {/if}
-                </button>
+
+        <button onclick={()=> handleBakeByHand()}
+            class="rounded-full max-h-1/2"
+            disabled={!hasBrownieAccount || !allowScCalls}
+            >
+                <img src="https://i.imgur.com/KjYzO0g.png" alt="Brownie Logo" 
+            class="h-full object-scale-down">
+        </button>
+        <div class="flex flex-col w-full justify-around items-center">
+            <div class="flex flex-row gap-2 justify-center items-end p-2">
+                <h1 class="text-5xl sm:text-7xl">{formatNumShortConstLen(totalBrownieBalance, 3)}</h1>
             </div>
+            <h2>{formatNumShort(totalBakeRatePerSecond)} / s</h2>
         </div>
+        <button 
+            onclick={() => handleClaimBrownies()}
+            class="rounded-lg border-4 border-[#731702] bg-[#BF6341] p-2 text-white w-[80%]"
+            disabled={!hasBrownieAccount}
+        >
+            {#if actionLoading}
+            <Spinner color="red" class="h-[55%]"/>
+            {:else}
+            <p>Claim {formatNumShortConstLen(unclaimedBrownieBalance, 1)}</p>
+            <p>baked brownies </p>
+            {/if}
+        </button>
     </div>
 
     <div class="flex flex-col items-center m-8 p-2 text-[#260101] bg-[#D99379] border-8 border-[#731702] w-full rounded-md max-w-[800px]">
