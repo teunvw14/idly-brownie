@@ -158,9 +158,8 @@
         });
     }
 
-    async function updateBrownieState() {
+    async function initAutoBakers() {
         let holdings = await iotaClient.getOwnedObjects({owner: activeWalletAccount.address, options: {showContent: true, showType: true}});
-        // Get brownie::Account
         let brownieAccountObjects = holdings.data.filter((obj) => {
             return obj.data?.type.includes(PACKAGE_ID + '::brownie::Account');
         });
@@ -172,7 +171,10 @@
         } else {
             updateAutoBakers(null);
         };
+    }
 
+    async function updateBrownieState() {
+        let holdings = await iotaClient.getOwnedObjects({owner: activeWalletAccount.address, options: {showContent: true, showType: true}});
         // Update BROWNIE balance
         let brownieCoins = holdings.data.filter((obj) => {
             return obj.data?.type.includes(PACKAGE_ID+'::brownie::BROWNIE');
@@ -181,7 +183,6 @@
         brownieCoins.forEach(coin => {
             claimedBrownieBalance += parseInt(coin.data?.content?.fields.balance)
         });
-        actionLoading = false;
     }
 
     function calculatePurchasePrice(stack: AutoBakerStack) {
@@ -194,6 +195,31 @@
         return result;
     }
 
+    async function handleClaimBrownies() {
+        actionLoading = true; 
+        try {
+            await claimBrownies(
+                iotaClient,
+                activeWallet,
+                activeWalletAccount,
+                brownieAccount,
+                updateBrownieState
+            );
+            autoBakers.forEach((stack: AutoBakerStack) => stack.lastClaimTimestampMs = onChainClockTimestampMs);
+            showToast(
+                ToastType.Info,
+                "Claimed brownies!",
+                CheckCircleOutline,
+                3_000
+            );
+        } catch(e) {
+            showToast(
+                ToastType.Warning,
+                "Something went wrong: " + e.message, CloseCircleSolid, 5_000);
+        }
+        actionLoading = false;
+    }
+
     async function handleBakeByHand() {
         actionLoading = true; 
         try {
@@ -202,7 +228,7 @@
                 activeWallet,
                 activeWalletAccount,
                 brownieAccount,
-                ()=>{}
+                updateBrownieState
             );
             showToast(
                 ToastType.Info,
@@ -230,7 +256,7 @@
                 autoBakerStack.autoBakerType,
                 buyMultiplier,
                 calculatePurchasePrice(autoBakerStack),
-                ()=>{}
+                updateBrownieState,
             );
             let stackToUpdate = autoBakers.filter((stack) => stack.autoBakerType.id == autoBakerStack.autoBakerType.id)[0];
             stackToUpdate.nextPriceBrownie = calculatePurchasePrice(stackToUpdate);
@@ -280,6 +306,7 @@
         await initializeWallet();
         await connectWallet();
         await initOnChainClockTimestampMs();
+        await initAutoBakers();
         await updateBrownieState();
     }
 
@@ -357,7 +384,7 @@ class="w-full h-[15vh]
                 </div>
                 <h2>{formatNumShort(totalBakeRatePerSecond)} / s</h2>
                 <button 
-                    onclick={() => claimBrownies(iotaClient, activeWallet, activeWalletAccount, brownieAccount, ()=>{console.log('test'); updateBrownieState()})}
+                    onclick={() => handleClaimBrownies()}
                     class="rounded-lg border-4 border-[#731702] bg-[#BF6341] p-1 text-white w-[70%]"
                     disabled={!hasBrownieAccount}
                 >
