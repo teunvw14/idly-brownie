@@ -1,6 +1,6 @@
 <script lang="ts">
     // Toasts
-    import { toast, Toast } from 'flowbite-svelte';
+    import { Toast, Spinner } from 'flowbite-svelte';
     import { CartPlusAltOutline, CheckCircleOutline, InfoCircleSolid, CloseCircleSolid, VolumeMuteSolid, VolumeUpSolid, StackoverflowSolid } from 'flowbite-svelte-icons';
     import { blur } from 'svelte/transition';
     
@@ -359,7 +359,7 @@ class="w-full h-[15vh]
 </div>
 
 <div class="w-[95%] sm:w-[70%] md:w-[60%] lg:w-[55%] xl:w-[45%] py-4 flex flex-col overflow-y-scroll no-scrollbar items-center">
-    <div class="flex flex-col p-4 items-center bg-[#D99379] border-8 border-[#731702] w-full h-[90%]">
+    <div class="flex flex-col p-4 items-center bg-[#D99379] border-8 border-[#731702] w-full h-[80vh]">
         {#if !hasBrownieAccount}
         <button 
             onclick={() => {buyAccount(iotaClient, activeWallet, activeWalletAccount, updateBrownieState)}}
@@ -388,8 +388,12 @@ class="w-full h-[15vh]
                     class="rounded-lg border-4 border-[#731702] bg-[#BF6341] p-1 text-white w-[70%]"
                     disabled={!hasBrownieAccount}
                 >
-                    <p>Claim {formatNumShortConstLen(unclaimedBrownieBalance)}</p>
+                    {#if actionLoading}
+                    <Spinner color="red" class="h-[55%]"/>
+                    {:else}
+                    <p>Claim {formatNumShortConstLen(unclaimedBrownieBalance, 1)}</p>
                     <p>baked brownies </p>
+                    {/if}
                 </button>
             </div>
         </div>
@@ -422,10 +426,14 @@ class="w-full h-[15vh]
             <div class="h-[23%] w-[95%]">
                 <button 
                 onclick={() => handleBuyAutoBakers(autoBakerStack)}
-                class="size-full border-2 bg-[#9ab503] hover:bg-[#b4c16a] rounded-md disabled:bg-[#6c7730]"
+                class="flex flex-row justify-center items-center size-full border-2 bg-[#9ab503] hover:bg-[#b4c16a] rounded-md disabled:bg-[#6c7730]"
                 disabled={totalBrownieBalance < calculatePurchasePrice(autoBakerStack) || !allowScCalls}
                 >
+                    {#if actionLoading}
+                    <Spinner color="red" class="h-[55%]"/>
+                    {:else}
                     <p>Buy {buyMultiplier} ({formatNumShort(calculatePurchasePrice(autoBakerStack))} BROWNIE)</p>
+                    {/if}
                 </button>
             </div>
         </div>
