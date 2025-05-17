@@ -8,8 +8,8 @@ import { ToastType } from '$lib'
 
 import type { AutoBakerType, AutoBakerStack, ToastMessage } from '$lib';
 
-export let PACKAGE_ID = "0x6f36f7d461306aa08b8e0949a8cb96188cea0028f0d67f6989c37fab9d0f4163";
-export let BROWNIE_INC = "0x95b4408fad39cc0e39b48fac9a4eff277814f56773120ab68067348853cb7277";
+export let PACKAGE_ID = "0x239b02dd3e7aefdd1e0a5976c4dba06a037a299dcef5448a197a9a6cfe11c6be";
+export let BROWNIE_INC = "0x0503319a9049633a0672aa803f05803acd4a5192c8cfa7d3f5e71e0671b879a9";
 
 
 const GAS_BUDGET = 100_000_000;
@@ -38,7 +38,7 @@ async function handleTxExecution(
     await iotaClient.waitForTransaction({ digest: transactionResult.digest });
 }
 
-export async function buyAccount(
+export async function createAccount(
     iotaClient: IotaClient, 
     wallet: Wallet,
     walletAccount: WalletAccount,
@@ -84,7 +84,21 @@ export async function bakeByHand(
             tx.object(BROWNIE_INC)
         ]
     });
-    tx.transferObjects([brownies], walletAccount.address);
+    
+    let holdings = await iotaClient.getOwnedObjects({owner: walletAccount.address, options: {showContent: true}});
+    let brownieCoins = holdings.data.filter((obj) => {
+        return obj.data?.content?.type.includes(PACKAGE_ID+'::brownie::BROWNIE');
+    });
+    let brownieCoinsIds = brownieCoins.map((brownie) => brownie.data?.objectId);
+    let brownieCoinObjects = brownieCoinsIds.map((id) => tx.object(id));
+        
+    // If no Coin<BROWNIE> owned, then split directly from claimedBrownies.
+    // Otherwise, first merge claimedBrownies into the first Coin<BROWNIE>.
+    if (brownieCoins.length > 0){
+        tx.mergeCoins(brownieCoinObjects[0], [brownies]);
+    } else {
+        tx.transferObjects([brownies], walletAccount.address);
+    }
     
     await handleTxExecution(iotaClient, tx, wallet, walletAccount);
 
@@ -112,7 +126,6 @@ export async function buyAutoBakers(
     });
     let brownieCoinsIds = brownieCoins.map((brownie) => brownie.data?.objectId);
     let brownieCoinObjects = brownieCoinsIds.map((id) => tx.object(id));
-    console.log(brownieCoinObjects);
     
     let claimedBrownies = callClaimBrownies(tx, walletAccount, brownieAccount);
     
@@ -178,7 +191,20 @@ export async function claimBrownies(
     tx.setGasBudget(GAS_BUDGET);
 
     let claimedBrownies = callClaimBrownies(tx, walletAccount, brownieAccount);
-    tx.transferObjects([claimedBrownies], walletAccount.address);
+    let holdings = await iotaClient.getOwnedObjects({owner: walletAccount.address, options: {showContent: true}});
+    let brownieCoins = holdings.data.filter((obj) => {
+        return obj.data?.content?.type.includes(PACKAGE_ID+'::brownie::BROWNIE');
+    });
+    let brownieCoinsIds = brownieCoins.map((brownie) => brownie.data?.objectId);
+    let brownieCoinObjects = brownieCoinsIds.map((id) => tx.object(id));
+        
+    // If no Coin<BROWNIE> owned, then split directly from claimedBrownies.
+    // Otherwise, first merge claimedBrownies into the first Coin<BROWNIE>.
+    if (brownieCoins.length > 0){
+        tx.mergeCoins(brownieCoinObjects[0], [claimedBrownies]);
+    } else {
+        tx.transferObjects([claimedBrownies], walletAccount.address);
+    }
 
     await handleTxExecution(iotaClient, tx, wallet, walletAccount);
     

@@ -94,7 +94,12 @@ export function formatNumShortConstLen(num: number, decimals: number) {
     }
 
     const scaledNum: number = num / max_scale[0];
-    const formattedNum: string = scaledNum.toFixed(decimals);
+    let formattedNum;
+    if (max_scale[0] > 1) {
+        formattedNum = scaledNum.toFixed(decimals);
+    } else {
+        formattedNum = scaledNum.toString();
+    }
 
     return formattedNum + max_scale[1]
 }

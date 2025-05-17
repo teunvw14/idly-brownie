@@ -1,6 +1,6 @@
 <script lang="ts">
     // Toasts
-    import { Toast, Spinner } from 'flowbite-svelte';
+    import { Toast, Spinner, A } from 'flowbite-svelte';
     import { CartPlusAltOutline, CheckCircleOutline, InfoCircleSolid, CloseCircleSolid, VolumeMuteSolid, VolumeUpSolid, StackoverflowSolid } from 'flowbite-svelte-icons';
     import { blur } from 'svelte/transition';
     
@@ -16,17 +16,17 @@
         }, duration_ms);
     }
     
-    import { getWallets, WalletStandardError } from '@mysten/wallet-standard';
+    import { getWallets, WalletStandardError, type Wallet } from '@mysten/wallet-standard';
     import { getFullnodeUrl, IotaClient, type ExecuteTransactionRequestType, type IotaObjectData, type IotaObjectResponse } from '@iota/iota-sdk/client';
     import { Transaction } from '@iota/iota-sdk/transactions';
     import { onMount } from 'svelte';
     import { nanosToIota, shortenHex, formatNum, timeHumanReadable, getObjectExplorerUrl, roundFractional, formatNumShort, formatNumShortConstLen } from '$lib/util'
-    import { PACKAGE_ID, BROWNIE_INC, AUTO_BAKER_PRICE_STEP_PCT, buyAccount, bakeByHand, buyAutoBakers, claimBrownies} from '$lib/smart_contract_calls' 
+    import { PACKAGE_ID, BROWNIE_INC, AUTO_BAKER_PRICE_STEP_PCT, createAccount, bakeByHand, buyAutoBakers, claimBrownies} from '$lib/smart_contract_calls' 
     
     import type { AutoBakerStack, AutoBakerType, ToastMessage } from '$lib';
     import { ToastType } from '$lib';
     
-    let activeWallet = $state(null);
+    let activeWallet: Wallet | null = $state(null);
     let activeWalletAccount = $state(null);
     let activeWalletAccountBalance = $state(0); 
 
@@ -156,6 +156,8 @@
                 autoBakers.push(zero_stack)
             }
         });
+        // Sort in order of ascending brownie baking rate
+        autoBakers.sort((a: AutoBakerStack, b: AutoBakerStack) => {return a.autoBakerType.ratePerHour - b.autoBakerType.ratePerHour});
     }
 
     async function initAutoBakers() {
@@ -185,6 +187,15 @@
         });
     }
 
+    function calculateNextPrice(stack: AutoBakerStack) {
+        let nextPrice = stack.nextPriceBrownie;
+        for (let i = 1; i <= buyMultiplier; i++) {
+            nextPrice = Math.floor(nextPrice * (100 + AUTO_BAKER_PRICE_STEP_PCT) / 100.0);
+        }
+        return nextPrice;
+    }
+
+    // Calculates the price of buying an upgrade
     function calculatePurchasePrice(stack: AutoBakerStack) {
         let result = 0;
         let nextPrice = stack.nextPriceBrownie;
@@ -256,12 +267,13 @@
                 autoBakerStack.autoBakerType,
                 buyMultiplier,
                 calculatePurchasePrice(autoBakerStack),
-                updateBrownieState,
+                updateBrownieState
             );
             let stackToUpdate = autoBakers.filter((stack) => stack.autoBakerType.id == autoBakerStack.autoBakerType.id)[0];
-            stackToUpdate.nextPriceBrownie = calculatePurchasePrice(stackToUpdate);
+            stackToUpdate.nextPriceBrownie = calculateNextPrice(stackToUpdate);
             stackToUpdate.number += buyMultiplier;
-            stackToUpdate.lastClaimTimestampMs = onChainClockTimestampMs;
+            // Buying AutoBakers also claims Brownies
+            autoBakers.forEach((stack: AutoBakerStack) => stack.lastClaimTimestampMs = onChainClockTimestampMs);
             showToast(ToastType.Info, "Bought " + buyMultiplier + " " + autoBakerStack.autoBakerType.name.toString() + ".", CheckCircleOutline, 3_000);
         } catch(e) {
             showToast(
@@ -288,12 +300,18 @@
     function cycleBuyMultiplier() {
         switch(buyMultiplier) {
             case 1:
+                buyMultiplier = 5;
+                break;
+            case 5:
                 buyMultiplier = 10;
                 break;
             case 10:
                 buyMultiplier = 25;
                 break;
             case 25:
+                buyMultiplier = 50;
+                break;
+            case 50:
                 buyMultiplier = 100
                 break;
             case 100:
@@ -327,7 +345,7 @@ class="w-full h-[15vh]
     flex flex-row justify-between items-center px-2 sm:px-8
     bg-[#D99379] border-[#731702] border-b-8"
 >
-    <div class="flex flex-row justify-start items-center h-full">
+    <div class="flex flex-row justify-start items-center h-full w-1/3">
         <button
             onclick={()=> {initializeWallet(); connectWallet(); showToast(ToastType.Info, "Connecting Wallet", InfoCircleSolid, 2_000)} }
             class="
@@ -345,10 +363,10 @@ class="w-full h-[15vh]
 
         </button>
     </div>
-    <div class="h-full flex flex-row justify-center items-center">
+    <div class="h-full flex flex-row justify-center items-center w-1/3">
         <img src="https://i.imgur.com/saQrZNb.png" alt="logo" class="h-full">
     </div>
-    <div class="h-full flex flex-row justify-end items-center">
+    <div class="h-full flex flex-row justify-end items-center p-2 w-1/3">
         <h1 class="text-xl sm:text-3xl">{formatNumShortConstLen(totalBrownieBalance, 0)}</h1>
         <img src="https://i.imgur.com/KjYzO0g.png" alt="Brownie Logo" class="h-1/2 sm:h-full object-scale-down">
         <!-- <div class="flex flex-row gap-2 text-xs">
@@ -361,20 +379,20 @@ class="w-full h-[15vh]
 <div id="body"
 class="w-[95%] sm:w-[70%] md:w-[60%] lg:w-[55%] xl:w-[45%] py-4 flex flex-col justify-between overflow-y-scroll no-scrollbar items-center">
     <div class="flex flex-col p-4 justify-between items-center bg-[#D99379] border-8 border-[#731702] w-full h-full">
-        {#if !hasBrownieAccount}
+        {#if !hasBrownieAccount && activeWalletAccount }
         <button 
-            onclick={() => {buyAccount(iotaClient, activeWallet, activeWalletAccount, updateBrownieState)}}
-            class="bg-blue-200 p-2 w-full h-20"
+            onclick={() => {createAccount(iotaClient, activeWallet, activeWalletAccount, initAutoBakers)}}
+            class="bg-blue-200 p-2 w-full h-16 rounded-lg hover:bg-blue-100 border-2"
         >
             No IdlyBrownie Account Found. Click here to create!
         </button>
         {:else}
-            <h2>Brownie Account: <a href={"https://iotascan.com/testnet/object/" + brownieAccount} class="hover:underline">{shortenHex(brownieAccount, 4)}</a></h2>
+            <h2>Brownie Account: <a href={"https://iotascan.com/testnet/object/" + brownieAccount} class="hover:underline">{brownieAccount ? shortenHex(brownieAccount, 4) : "Loading..."}</a></h2>
         {/if}
 
         <button onclick={()=> handleBakeByHand()}
             class="rounded-full max-h-1/2"
-            disabled={!hasBrownieAccount || !allowScCalls}
+            disabled={!hasBrownieAccount}
             >
                 <img src="https://i.imgur.com/KjYzO0g.png" alt="Brownie Logo" 
             class="h-full object-scale-down">
@@ -387,8 +405,8 @@ class="w-[95%] sm:w-[70%] md:w-[60%] lg:w-[55%] xl:w-[45%] py-4 flex flex-col ju
         </div>
         <button 
             onclick={() => handleClaimBrownies()}
-            class="rounded-lg border-4 border-[#731702] bg-[#BF6341] p-2 text-white w-[80%]"
-            disabled={!hasBrownieAccount}
+            class="rounded-lg border-4 border-[#731702] bg-[#BF6341] disabled:bg-[#bc7a62] p-2 text-white w-[80%]"
+            disabled={!hasBrownieAccount || unclaimedBrownieBalance == 0}
         >
             {#if actionLoading}
             <Spinner color="red" class="h-[55%]"/>
@@ -404,7 +422,7 @@ class="w-[95%] sm:w-[70%] md:w-[60%] lg:w-[55%] xl:w-[45%] py-4 flex flex-col ju
             <h1 class="font-bold text-xl m-4"> Bake some brownies!</h1>
             <button 
                 onclick={cycleBuyMultiplier}
-                class="w-1/4 p-2 m-4 bg-orange-400"
+                class="w-1/4 p-2 m-4 bg-orange-400 border-2 rounded hover:bg-orange-300"
                 disabled={!hasBrownieAccount}
             >
                 {buyMultiplier} x
@@ -465,13 +483,13 @@ class="w-[95%] sm:w-[70%] md:w-[60%] lg:w-[55%] xl:w-[45%] py-4 flex flex-col ju
     ">
         <div class="flex flex-row items-center gap-1">
             {#if toast.icon == CartPlusAltOutline}
-                <CartPlusAltOutline class="w-[7%] sm:w-[5%]"/>
+                <CartPlusAltOutline class="size-6 sm:size-8"/>
             {:else if toast.icon == CheckCircleOutline}
-                <CheckCircleOutline class="w-[7%] sm:w-[5%]"/>
+                <CheckCircleOutline class="size-6 sm:size-8"/>
             {:else if toast.icon == InfoCircleSolid}
-                <InfoCircleSolid class="w-[7%] sm:w-[5%]"/>
+                <InfoCircleSolid class="size-6 sm:size-8"/>
             {:else if toast.icon == CloseCircleSolid}
-                <CloseCircleSolid class="w-[7%] sm:w-[5%]"/>
+                <CloseCircleSolid class="size-6 sm:size-8"/>
             {/if}
             <p class="text-md sm:text-lg">
                 {toast.message}
