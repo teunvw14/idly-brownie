@@ -34,7 +34,9 @@
         0: "https://i.imgur.com/yQaneY8.png",
         1: "https://i.imgur.com/aWocXLE.png",
         2: "https://i.imgur.com/l9pZiRG.png",
-        3: "https://i.imgur.com/NejEXR9.png",        
+        3: "https://i.imgur.com/NejEXR9.png",
+        4: "https://i.imgur.com/sIuh5Oi.png",
+        5: "https://i.imgur.com/5OBCTq9.png",
     }
 
     let brownieAccount = $state("");
