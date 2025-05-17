@@ -8,8 +8,8 @@ import { ToastType } from '$lib'
 
 import type { AutoBakerType, AutoBakerStack, ToastMessage } from '$lib';
 
-export let PACKAGE_ID = "0x239b02dd3e7aefdd1e0a5976c4dba06a037a299dcef5448a197a9a6cfe11c6be";
-export let BROWNIE_INC = "0x0503319a9049633a0672aa803f05803acd4a5192c8cfa7d3f5e71e0671b879a9";
+export let PACKAGE_ID = "0xff373200fefe3b5140ec6419577614dd94cad0856a161284a9f92cde7efccc1e";
+export let BROWNIE_INC = "0xbcb869ae564269263308104546052733bf4850d1dbe9a3d1c9a37372600540cf";
 
 
 const GAS_BUDGET = 100_000_000;

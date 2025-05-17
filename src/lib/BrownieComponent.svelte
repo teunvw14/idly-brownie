@@ -369,7 +369,7 @@ class="w-full h-[15vh]
         <img src="https://i.imgur.com/saQrZNb.png" alt="logo" class="h-full">
     </div>
     <div class="h-full flex flex-row justify-end items-center p-2 w-1/3">
-        <h1 class="text-xl sm:text-3xl">{formatNumShortConstLen(totalBrownieBalance, 0)}</h1>
+        <h1 class="text-xl sm:text-3xl">{formatNumShortConstLen(totalBrownieBalance, 1)}</h1>
         <img src="https://i.imgur.com/KjYzO0g.png" alt="Brownie Logo" class="h-1/2 sm:h-full object-scale-down">
         <!-- <div class="flex flex-row gap-2 text-xs">
             <p>On-chain Time:</p>
